@@ -6,7 +6,7 @@ filter <- function(filename)
 {
   data <- read_tsv(paste("../data/", filename, ".tsv", sep=""))
   
-  data <- data %>% select(prompt, mood, mood_idx, sentiment, context)
+  data <- data %>% select(prompt, mood_idx) %>% rename(text = prompt, labels = mood_idx)
   write.table(data, file = paste("../data/", filename, "-clean.tsv", sep=""), sep = "\t", 
               quote = FALSE, row.names = FALSE)
 }
