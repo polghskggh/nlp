@@ -1,19 +1,31 @@
 library(readr)
 library(dplyr)
+library(superml)
+
+
+data_t <- read.csv("../data/train.csv", sep=";")
+# create a label encoder object
+encoder <- LabelEncoder$new()
+
+# fitting the data over the x vector
+encoder$fit(data_t$emotion)
 
 
 filter <- function(filename)
 {
-  data <- read_tsv(paste("../data/", filename, ".tsv", sep=""))
-  
-  data <- data %>% select(prompt, mood_idx) %>% rename(text = prompt, labels = mood_idx)
-  write.table(data, file = paste("../data/", filename, "-clean.tsv", sep=""), sep = "\t", 
-              quote = FALSE, row.names = FALSE)
+    data <- read.csv(paste("../data/", filename, ".csv", sep=""), sep=";")
+    data$emotion <- encoder$transform(data$emotion)
+
+    data <- data %>% select(essay, emotion) %>% rename(text = essay, labels = emotion)
+
+    write.table(data, file = paste("../data/", filename, "-clean.csv", sep=""), sep = ";",
+                quote = FALSE, row.names = FALSE)
 }
 
 
-filter("test-emotion")
-filter("train-emotion")
-filter("val-emotion")
+
+
+filter("test")
+filter("train")
 
 

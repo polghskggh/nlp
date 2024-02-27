@@ -1,14 +1,11 @@
-import torch.cuda
 from datasets import load_dataset
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding, AutoTokenizer, AutoModelForSequenceClassification)
-from torch.nn import CrossEntropyLoss
 
 
 def load_data():
     data_files = {
-        "train": "data/train-emotion-clean.tsv",
-        "test": "data/test-emotion-clean.tsv",
-        "validation": "data/val-emotion-clean.tsv",
+        "train": "../data/train-clean.csv",
+        "test": "../data/test-clean.csv",
     }
     return load_dataset("csv", data_files=data_files, delimiter='\t'),
 
@@ -35,8 +32,7 @@ def main():
 
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
-    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path,
-                                                               num_labels=9)
+    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
 
     print("Hello")
 
