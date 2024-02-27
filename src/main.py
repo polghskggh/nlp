@@ -39,7 +39,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=dataset["train"],
-        eval_dataset=dataset["validation"],
+        eval_dataset=dataset["test"],
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
