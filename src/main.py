@@ -7,7 +7,7 @@ def load_data():
         "train": "../data/train-clean.csv",
         "test": "../data/test-clean.csv",
     }
-    return load_dataset("csv", data_files=data_files, delimiter='\t'),
+    return load_dataset("csv", data_files=data_files, delimiter=';'),
 
 
 def tokenize(dataset, tokenizer):
@@ -15,7 +15,8 @@ def tokenize(dataset, tokenizer):
 
 
 def main():
-    dataset = load_data()[0]
+    dataset = load_data()
+    print(dataset)
 
     pretrained_path = "google-bert/bert-base-cased"
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
@@ -33,8 +34,6 @@ def main():
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
-
-    print("Hello")
 
     trainer = Trainer(
         model=model,
