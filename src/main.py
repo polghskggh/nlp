@@ -62,6 +62,7 @@ def main():
         train_dataset=dataset["train"],
         eval_dataset=dataset["validation"],
         tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
         data_collator=data_collator,
     )
     trainer.train()
