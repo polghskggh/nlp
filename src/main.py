@@ -7,9 +7,9 @@ from sklearn.metrics import confusion_matrix
 
 def load_data():
     data_files = {
-        "train": "../data/train-clean.csv",
-        "test": "../data/test-clean.csv",
-        "validation": "../data/val-clean.csv",
+        "train": "programs/nlp/data/train-clean.csv",
+        "test": "programs/nlp/data/test-clean.csv",
+        "validation": "programs/nlp/data/val-clean.csv",
     }
     return load_dataset("csv", data_files=data_files, delimiter='\t'),
 
@@ -18,21 +18,25 @@ def tokenize(dataset, tokenizer):
     return tokenizer(dataset["text"])
 
 
-def test_model(model, dataset):
-    predictions = model.forward(dataset["text"]).logits.argmax(axis=1)
-    metrics = compute_metrics(zip(predictions, dataset["label"]))
-    confusion_matrix(dataset["label"], predictions)
+def test_model(trainer, dataset):
+    predictions, labels, _ = trainer.predict(dataset)
+    metrics = compute_metrics(predictions, labels)
+    confusion_matrix(labels, predictions)
     return metrics, confusion_matrix
 
 
-def compute_metrics(eval_pred):
-    logits, labels = eval_pred
-    predictions = logits.argmax(axis=1)
+def prepare_labels(pred):
+    logits, labels = pred
+    predictions = logits.argmax(axis=-1)
+    compute_metrics(predictions, labels)
 
-    metrics = [evaluate.load("accuracy"), evaluate.load("f1"), evaluate.load("precision"), evaluate.load("recall")]
-    comutations = [metric.compute(predictions, labels) for metric in metrics]
 
-    return comutations
+def compute_metrics(predictions, labels):
+    metrics = [evaluate.load("f1"), evaluate.load("precision"), evaluate.load("recall")]
+    computations = [metric.compute(predictions=predictions, references=labels, average=None) for metric in metrics]
+    final_metric = evaluate.load("accuracy")
+    computations.append(final_metric.compute(predictions=predictions, references=labels))
+    return computations[0]
 
 
 def main():
@@ -62,12 +66,12 @@ def main():
         train_dataset=dataset["train"],
         eval_dataset=dataset["validation"],
         tokenizer=tokenizer,
-        compute_metrics=compute_metrics,
+        compute_metrics=prepare_labels,
         data_collator=data_collator,
     )
     trainer.train()
 
-    scores, confusion_mat = test_model(trainer.model, dataset["test"])
+    scores, confusion_mat = test_model(trainer, dataset["test"])
     print(scores, confusion_mat)
 
 
