@@ -1,22 +1,23 @@
 from datasets import load_dataset
-import evaluate
+
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
                           AutoTokenizer, AutoModelForSequenceClassification)
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 import numpy as np
 
 
 def load_data():
     data_files = {
-        "train": "../data/train-clean.csv",
-        "test": "../data/val-clean.csv",
-        "validation": "../data/val-clean.csv",
+        "train": "programs/nlp/data/train-clean.csv",
+        "test": "programs/nlp/data/val-clean.csv",
+        "validation": "programs/nlp/data/val-clean.csv",
     }
     return load_dataset("csv", data_files=data_files, delimiter='\t'),
 
 
 def tokenize(dataset, tokenizer):
-    return tokenizer(dataset["text"])
+    return tokenizer(dataset["text"], padding=True, truncation=True, return_tensors="pt")
 
 
 def test_model(trainer, dataset):
@@ -34,22 +35,21 @@ def prepare_labels(pred):
 
 
 def compute_metrics(predictions, labels):
-    metrics = [evaluate.load("f1"), evaluate.load("precision"), evaluate.load("recall")]
-    computations = [metric.compute(predictions=predictions, references=labels, average='micro') for metric in metrics]
-    final_metric = evaluate.load("accuracy")
-    computations.append(final_metric.compute(predictions=predictions, references=labels))
+    computations = [accuracy_score(labels, predictions),
+                    precision_score(labels, predictions, average='macro'),
+                    recall_score(labels, predictions, average='macro'),
+                    f1_score(labels, predictions, average='macro')]
     return {
-        'accuracy': computations[3]['accuracy'],
-        'precision': computations[1]['precision'],
-        'recall': computations[2]['recall'],
-        'f1': computations[0]['f1'],
+        'accuracy': computations[0],
+        'precision': computations[1],
+        'recall': computations[2],
+        'f1': computations[3],
     }
 
 
 def main():
     dataset = load_data()[0]
-
-    pretrained_path = "google-bert/bert-base-cased"
+    pretrained_path = "FacebookAI/roberta-base"
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
 
     training_args = TrainingArguments(
@@ -58,7 +58,7 @@ def main():
         learning_rate=1e-5,
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
-        num_train_epochs=1
+        num_train_epochs=100
     )
 
     dataset = dataset.map(tokenize, batched=True, fn_kwargs={"tokenizer": tokenizer})
@@ -66,9 +66,6 @@ def main():
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
 
     model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
-
-    for param in model.bert.parameters():
-        param.requires_grad = False
 
     trainer = Trainer(
         model=model,
@@ -81,8 +78,8 @@ def main():
     )
     trainer.train()
 
-    # scores, confusion_mat = test_model(trainer, dataset["test"])
-    # print(scores, '\n', confusion_mat)
+    scores, confusion_mat = test_model(trainer, dataset["validation"])
+    print(scores, '\n', confusion_mat)
 
 
 if __name__ == '__main__':
