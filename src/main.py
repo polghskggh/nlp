@@ -10,19 +10,36 @@ import numpy as np
 import csv
 
 
+# load the datasets
 def load_data():
     data_files = {
-        "train": "../data/train-clean.csv",
-        "test": "../data/test-clean.csv",
-        "validation": "../data/val-clean.csv",
+        'train': '../data/train-clean.csv',
+        'test': '../data/test-clean.csv',
+        'validation': '../data/val-clean.csv',
     }
-    return load_dataset("csv", data_files=data_files, delimiter='\t'),
+    return load_dataset('csv', data_files=data_files, delimiter='\t'),
+
+
+# prepare header for the data to save
+def prepare_header(header: list[str], filename):
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows([header])
+
+
+# save data
+def store_data(data: list[list], filename):
+    with open(filename, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+        file.flush()
 
 
 def tokenize(dataset, tokenizer):
-    return tokenizer(dataset["text"], padding=True, truncation=True, return_tensors="pt")
+    return tokenizer(dataset['text'], padding=True, truncation=True, return_tensors='pt')
 
 
+# make final evaluation of the model
 def test_model(trainer, dataset):
     logits, labels, _ = trainer.predict(dataset)
     predictions = np.argmax(logits, axis=-1)
@@ -31,34 +48,21 @@ def test_model(trainer, dataset):
     return metrics, conf_matrix
 
 
+# extract predictions and labels from model output
 def prepare_labels(pred):
     logits, labels = pred
     predictions = np.argmax(logits, axis=-1)
     return compute_metrics(predictions, labels)
 
 
-def prepare_header(header: list[str], filename):
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows([header])
-
-    # flush data into file
-
-
-def store_data(data: list[list], filename):
-    with open(filename, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data)
-        file.flush()
-
-
+# compute and save accuracy, precision, recall and F1
 def compute_metrics(predictions, labels):
     computations = [accuracy_score(labels, predictions),
                     precision_score(labels, predictions, average='macro'),
                     recall_score(labels, predictions, average='macro'),
                     f1_score(labels, predictions, average='macro')]
 
-    store_data([computations], "metrics.csv")
+    store_data([computations], 'metrics.csv')
 
     metrics = {
         'accuracy': computations[0],
@@ -69,6 +73,7 @@ def compute_metrics(predictions, labels):
     return metrics
 
 
+# evaluate the baseline model on the metrics
 def evaluate_baseline(dataset):
     baseline = DummyClassifier(strategy='most_frequent')
     baseline.fit(dataset['train']['text'], dataset['train']['labels'])
@@ -77,35 +82,36 @@ def evaluate_baseline(dataset):
 
 
 def main():
+    # prepare data
     dataset = load_data()[0]
+    prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
+    prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
 
-    pretrained_path = "FacebookAI/roberta-base"
+    # prepare tokenizer and model
+    pretrained_path = 'FacebookAI/roberta-base'
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
+    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
 
-    prepare_header(['accuracy', 'precision', 'recall', 'f1'], "metrics.csv")
-
-    prepare_header(["0","1","2","3","4","5","6"], "confusion.csv")
-
+    # hyperparams
     training_args = TrainingArguments(
-        output_dir="model/",
-        evaluation_strategy="epoch",
+        output_dir='model/',
+        evaluation_strategy='epoch',
         learning_rate=1e-5,
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
         num_train_epochs=10
     )
 
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={"tokenizer": tokenizer})
+    # tokenize data
+    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
 
+    # train the model
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
-
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=dataset["train"],
-        eval_dataset=dataset["validation"],
+        train_dataset=dataset['train'],
+        eval_dataset=dataset['validation'],
         tokenizer=tokenizer,
         compute_metrics=prepare_labels,
         data_collator=data_collator,
@@ -113,13 +119,9 @@ def main():
     trainer.train()
 
     # final evaluation
-    print(evaluate_baseline(dataset))
-
-    scores, confusion_mat = test_model(trainer, dataset["validation"])
-    scores, confusion_mat = test_model(trainer, dataset["test"])
-    print(scores, '\n', confusion_mat)
-
-    store_data(confusion_mat, "confusion.csv")
+    print('Baseline Metrics:', evaluate_baseline(dataset))
+    scores, confusion_mat = test_model(trainer, dataset['test'])
+    store_data(confusion_mat, 'confusion.csv')
 
 
 if __name__ == '__main__':
