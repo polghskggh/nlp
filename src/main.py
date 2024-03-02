@@ -97,7 +97,7 @@ def main():
     )
     trainer.train()
 
-    scores, confusion_mat = test_model(trainer, dataset["validation"])
+    scores, confusion_mat = test_model(trainer, dataset["test"])
     print(scores, '\n', confusion_mat)
 
     store_data(confusion_mat, "confusion.csv")
