@@ -3,13 +3,14 @@ import evaluate
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
                           AutoTokenizer, AutoModelForSequenceClassification)
 from sklearn.metrics import confusion_matrix
+import numpy as np
 
 
 def load_data():
     data_files = {
-        "train": "programs/nlp/data/train-clean.csv",
-        "test": "programs/nlp/data/test-clean.csv",
-        "validation": "programs/nlp/data/val-clean.csv",
+        "train": "../data/train-clean.csv",
+        "test": "../data/val-clean.csv",
+        "validation": "../data/val-clean.csv",
     }
     return load_dataset("csv", data_files=data_files, delimiter='\t'),
 
@@ -19,24 +20,30 @@ def tokenize(dataset, tokenizer):
 
 
 def test_model(trainer, dataset):
-    predictions, labels, _ = trainer.predict(dataset)
+    logits, labels, _ = trainer.predict(dataset)
+    predictions = np.argmax(logits, axis=-1)
     metrics = compute_metrics(predictions, labels)
-    confusion_matrix(labels, predictions)
-    return metrics, confusion_matrix
+    conf_matrix = confusion_matrix(labels, predictions)
+    return metrics, conf_matrix
 
 
 def prepare_labels(pred):
     logits, labels = pred
-    predictions = logits.argmax(axis=-1)
-    compute_metrics(predictions, labels)
+    predictions = np.argmax(logits, axis=-1)
+    return compute_metrics(predictions, labels)
 
 
 def compute_metrics(predictions, labels):
     metrics = [evaluate.load("f1"), evaluate.load("precision"), evaluate.load("recall")]
-    computations = [metric.compute(predictions=predictions, references=labels, average=None) for metric in metrics]
+    computations = [metric.compute(predictions=predictions, references=labels, average='micro') for metric in metrics]
     final_metric = evaluate.load("accuracy")
     computations.append(final_metric.compute(predictions=predictions, references=labels))
-    return computations[0]
+    return {
+        'accuracy': computations[3]['accuracy'],
+        'precision': computations[1]['precision'],
+        'recall': computations[2]['recall'],
+        'f1': computations[0]['f1'],
+    }
 
 
 def main():
@@ -60,6 +67,9 @@ def main():
 
     model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
 
+    for param in model.bert.parameters():
+        param.requires_grad = False
+
     trainer = Trainer(
         model=model,
         args=training_args,
@@ -71,8 +81,8 @@ def main():
     )
     trainer.train()
 
-    scores, confusion_mat = test_model(trainer, dataset["test"])
-    print(scores, confusion_mat)
+    # scores, confusion_mat = test_model(trainer, dataset["test"])
+    # print(scores, '\n', confusion_mat)
 
 
 if __name__ == '__main__':
