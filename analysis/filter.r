@@ -1,6 +1,5 @@
 library(readr)
 library(dplyr)
-library(superml)
 library(caTools)
 
 data_t <- read.csv("../data/train.csv", sep=";")
