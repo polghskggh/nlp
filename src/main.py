@@ -1,23 +1,34 @@
 from datasets import load_dataset
 
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
-                          AutoTokenizer, AutoModelForSequenceClassification)
+                          AutoTokenizer, AutoModel, AutoConfig, FlaxAutoModel)
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 from sklearn.dummy import DummyClassifier
 
 import numpy as np
 import csv
+import flax.linen as nn
+from jax import random
+
+from datasets import load_dataset, DatasetDict
+
+
+def load_module(pretrained_path: str):
+    model = FlaxAutoModel.from_pretrained(pretrained_path)
+    params = {"params": model.params}
+    module = model.module
+    return module, params
 
 
 # load the datasets
 def load_data():
-    data_files = {
-        'train': '../data/train-clean.csv',
-        'test': '../data/test-clean.csv',
-        'validation': '../data/val-clean.csv',
-    }
-    return load_dataset('csv', data_files=data_files, delimiter='\t'),
+    data_path = "rajpurkar/squad"
+    train = load_dataset(data_path, split='train[:1000]')
+    val = load_dataset(data_path, split='validation[:100]')
+    dataset = DatasetDict()
+    dataset['train'], dataset['validation'] = train, val
+    return dataset
 
 
 # prepare header for the data to save
@@ -83,15 +94,18 @@ def evaluate_baseline(dataset):
 
 def main():
     # prepare data
-    dataset = load_data()[0]
-    prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
-    prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
+    dataset = load_data()
 
     # prepare tokenizer and model
     pretrained_path = 'FacebookAI/roberta-base'
+    model, params = load_module(pretrained_path)
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
-    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
 
+    nn.tabulate(model, random.key(0))(tokenizer.tokenizer('Hello, my dog is cute.'))
+
+    prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
+    prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
+    return
     # hyperparams
     training_args = TrainingArguments(
         output_dir='model/',
