@@ -1,6 +1,7 @@
 library(readr)
 library(dplyr)
 library(caTools)
+library(superml)
 
 data_t <- read.csv("../data/train.csv", sep=";")
 # create a label encoder object
