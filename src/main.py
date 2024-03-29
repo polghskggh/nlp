@@ -1,7 +1,7 @@
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
-                          AutoTokenizer, AutoModelForSequenceClassification)
+                          AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM)
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
 from sklearn.dummy import DummyClassifier
@@ -10,14 +10,26 @@ import numpy as np
 import csv
 
 
+def load_module(model_type: str = 'seq2seq'):
+    if model_type == 'seq2seq':
+        pretrained_path = 'google/roberta2roberta_L-24_discofuse'
+        model = AutoModelForSeq2SeqLM.from_pretrained(pretrained_path)
+    else:
+        pretrained_path = 'FacebookAI/roberta-base'
+        model = AutoModelForSequenceClassification.from_pretrained(pretrained_path)
+    return model
+
+
 # load the datasets
 def load_data():
-    data_files = {
-        'train': '../data/train-clean.csv',
-        'test': '../data/test-clean.csv',
-        'validation': '../data/val-clean.csv',
-    }
-    return load_dataset('csv', data_files=data_files, delimiter='\t'),
+    data_path = "rajpurkar/squad"
+    train = load_dataset(data_path, split='train[:1000]')
+    val = load_dataset(data_path, split='validation[:100]')
+    dataset = DatasetDict()
+    dataset['train'], dataset['validation'] = train, val
+    return dataset
+
+
 
 
 # prepare header for the data to save
@@ -83,15 +95,14 @@ def evaluate_baseline(dataset):
 
 def main():
     # prepare data
-    dataset = load_data()[0]
     prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
     prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
 
     # prepare tokenizer and model
     pretrained_path = 'FacebookAI/roberta-base'
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
-    model = AutoModelForSequenceClassification.from_pretrained(pretrained_path, num_labels=7)
-
+    model_classification = load_module('classification')
+    model_seq2seq = load_module('seq2seq')
     # hyperparams
     training_args = TrainingArguments(
         output_dir='model/',
@@ -101,6 +112,8 @@ def main():
         per_device_eval_batch_size=9,
         num_train_epochs=10
     )
+    return
+    dataset = load_data()
 
     # tokenize data
     dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
