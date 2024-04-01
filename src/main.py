@@ -121,7 +121,7 @@ def main():
     # train the model
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     trainer = Trainer(
-        model=model,
+        model=model_classification,
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
