@@ -22,14 +22,13 @@ def load_module(model_type: str = 'seq2seq'):
 
 # load the datasets
 def load_data():
-    data_path = "rajpurkar/squad"
-    train = load_dataset(data_path, split='train[:1000]')
-    val = load_dataset(data_path, split='validation[:100]')
-    dataset = DatasetDict()
-    dataset['train'], dataset['validation'] = train, val
-    return dataset
-
-
+    data_path = {
+        "train": "programs/nlp/data/class_data.csv",
+        "validation": "programs/nlp/data/class_data_dev.csv",
+        "train2": "programs/nlp/data/seq2seq_data.csv",
+        "validation2": "programs/nlp/data/seq2seq_data_dev.csv"
+    }
+    return load_dataset('csv', data_files=data_path)
 
 
 # prepare header for the data to save
@@ -103,6 +102,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
     model_classification = load_module('classification')
     model_seq2seq = load_module('seq2seq')
+
     # hyperparams
     training_args = TrainingArguments(
         output_dir='model/',
@@ -112,7 +112,7 @@ def main():
         per_device_eval_batch_size=9,
         num_train_epochs=10
     )
-    return
+
     dataset = load_data()
 
     # tokenize data
@@ -122,6 +122,17 @@ def main():
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     trainer = Trainer(
         model=model_classification,
+        args=training_args,
+        train_dataset=dataset['train'],
+        eval_dataset=dataset['validation'],
+        tokenizer=tokenizer,
+        compute_metrics=prepare_labels,
+        data_collator=data_collator,
+    )
+    trainer.train()
+
+    trainer = Trainer(
+        model=model_seq2seq,
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
