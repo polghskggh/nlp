@@ -1,142 +1,92 @@
-import torch
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset
+from transformers import AutoTokenizer
+from transformers import DefaultDataCollator
+from transformers import AutoModelForQuestionAnswering, TrainingArguments, Trainer
 
-from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
-                          AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM)
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
-from sklearn.dummy import DummyClassifier
-
-import numpy as np
-import csv
+tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
 
 
-def load_module(model_type: str = 'seq2seq'):
-    if model_type == 'seq2seq':
-        pretrained_path = 'google/roberta2roberta_L-24_discofuse'
-        model = AutoModelForSeq2SeqLM.from_pretrained(pretrained_path)
-    else:
-        pretrained_path = 'FacebookAI/roberta-base'
-        model = AutoModelForSequenceClassification.from_pretrained(pretrained_path)
-    return model
+def preprocess_function(examples):
+    questions = [q.strip() for q in examples["question"]]
+    inputs = tokenizer(
+        questions,
+        examples["context"],
+        max_length=384,
+        truncation="only_second",
+        return_offsets_mapping=True,
+        padding="max_length",
+    )
 
+    offset_mapping = inputs.pop("offset_mapping")
+    answers = examples["answers"]
+    start_positions = []
+    end_positions = []
 
-# load the datasets
-def load_data():
-    data_path = {"train": "../data/seq2seq_data.csv", "validation": "../data/seq2seq_data_dev.csv"}
-    return load_dataset("csv", data_files=data_path)
+    for i, offset in enumerate(offset_mapping):
+        answer = answers[i]
+        start_char = answer["answer_start"][0]
+        end_char = answer["answer_start"][0] + len(answer["text"][0])
+        sequence_ids = inputs.sequence_ids(i)
 
+        # Find the start and end of the context
+        idx = 0
+        while sequence_ids[idx] != 1:
+            idx += 1
+        context_start = idx
+        while sequence_ids[idx] == 1:
+            idx += 1
+        context_end = idx - 1
 
-# prepare header for the data to save
-def prepare_header(header: list[str], filename):
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows([header])
+        # If the answer is not fully inside the context, label it (0, 0)
+        if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+            start_positions.append(0)
+            end_positions.append(0)
+        else:
+            # Otherwise it's the start and end token positions
+            idx = context_start
+            while idx <= context_end and offset[idx][0] <= start_char:
+                idx += 1
+            start_positions.append(idx - 1)
 
+            idx = context_end
+            while idx >= context_start and offset[idx][1] >= end_char:
+                idx -= 1
+            end_positions.append(idx + 1)
 
-# save data
-def store_data(data: list[list], filename):
-    with open(filename, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data)
-        file.flush()
-
-
-def tokenize(dataset, column, tokenizer):
-    return tokenizer(dataset[column], padding=True, truncation=True, return_tensors='pt')
-
-
-# make final evaluation of the model
-def test_model(trainer, dataset):
-    logits, labels, _ = trainer.predict(dataset)
-    predictions = np.argmax(logits, axis=-1)
-    metrics = compute_metrics(predictions, labels)
-    conf_matrix = confusion_matrix(labels, predictions)
-    return metrics, conf_matrix
-
-
-# extract predictions and labels from model output
-def prepare_labels(pred):
-    logits, labels = pred
-    predictions = np.argmax(logits, axis=-1)
-    return compute_metrics(predictions, labels)
-
-
-# compute and save accuracy, precision, recall and F1
-def compute_metrics(predictions, labels):
-    computations = [accuracy_score(labels, predictions),
-                    precision_score(labels, predictions, average='macro'),
-                    recall_score(labels, predictions, average='macro'),
-                    f1_score(labels, predictions, average='macro')]
-
-    store_data([computations], 'metrics.csv')
-
-    metrics = {
-        'accuracy': computations[0],
-        'precision': computations[1],
-        'recall': computations[2],
-        'f1': computations[3],
-    }
-    return metrics
-
-
-# evaluate the baseline model on the metrics
-def evaluate_baseline(dataset):
-    baseline = DummyClassifier(strategy='most_frequent')
-    baseline.fit(dataset['train']['text'], dataset['train']['labels'])
-    predictions = baseline.predict(dataset['test']['text'])
-    return compute_metrics(predictions, dataset['test']['labels'])
+    inputs["start_positions"] = start_positions
+    inputs["end_positions"] = end_positions
+    return inputs
 
 
 def main():
+    squad = load_dataset("squad", split="train[:5000]")
+    squad = squad.train_test_split(test_size=0.2)
+    tokenized_squad = squad.map(preprocess_function, batched=True, remove_columns=squad["train"].column_names)
 
-    if torch.backends.mps.is_available():
-        device = torch.device("mps")
-        out = torch.ones(1, device=device)
-        print(out)
-        print("MPS device found. - Apple Silicon GPU")
+    data_collator = DefaultDataCollator()
 
-    # prepare data
-    prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
-    prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
+    model = AutoModelForQuestionAnswering.from_pretrained("FacebookAI/roberta-base")
 
-    # prepare tokenizer and model
-    pretrained_path = 'FacebookAI/roberta-base'
-    tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
-    model_seq2seq = load_module('seq2seq')
-    # hyperparams
     training_args = TrainingArguments(
-        output_dir='model/',
-        evaluation_strategy='steps',
-        learning_rate=1e-5,
-        per_device_train_batch_size=9,
-        per_device_eval_batch_size=9,
-        num_train_epochs=1
+        output_dir="my_awesome_qa_model",
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
+        num_train_epochs=3,
+        weight_decay=0.01,
     )
 
-    dataset = load_data()
-
-    # tokenize data
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer, 'column' : "input_ids"})
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer, 'column': "target"})
-
-    # train the model
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     trainer = Trainer(
-        model=model_seq2seq,
+        model=model,
         args=training_args,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['validation'],
+        train_dataset=tokenized_squad["train"],
+        eval_dataset=tokenized_squad["test"],
         tokenizer=tokenizer,
-        compute_metrics=prepare_labels,
         data_collator=data_collator,
     )
-    trainer.train()
 
-    # final evaluation
-    print('Baseline Metrics:', evaluate_baseline(dataset))
-    scores, confusion_mat = test_model(trainer, dataset['train'])
-    store_data(confusion_mat, 'confusion.csv')
+    trainer.train()
 
 
 if __name__ == '__main__':
