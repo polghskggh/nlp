@@ -59,9 +59,10 @@ def preprocess_function(examples):
 
 
 def main():
-    squad = load_dataset("squad", split="train[:5000]")
-    squad = squad.train_test_split(test_size=0.2)
-    tokenized_squad = squad.map(preprocess_function, batched=True, remove_columns=squad["train"].column_names)
+    traing_data = load_dataset("squad", split="train")
+    validation_data = load_dataset("squad", split="validation")
+    tokenized_training_data = traing_data.map(preprocess_function, batched=True)
+    tokenized_validation_data = validation_data.map(preprocess_function, batched=True)
 
     data_collator = DefaultDataCollator()
 
@@ -71,8 +72,8 @@ def main():
         output_dir="my_awesome_qa_model",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        per_device_train_batch_size=30,
+        per_device_eval_batch_size=30,
         num_train_epochs=3,
         weight_decay=0.01,
     )
@@ -80,8 +81,8 @@ def main():
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_squad["train"],
-        eval_dataset=tokenized_squad["test"],
+        train_dataset=tokenized_training_data,
+        eval_dataset=tokenized_validation_data,
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
