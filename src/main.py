@@ -1,3 +1,4 @@
+import torch
 from datasets import load_dataset, DatasetDict
 
 from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
@@ -22,14 +23,8 @@ def load_module(model_type: str = 'seq2seq'):
 
 # load the datasets
 def load_data():
-    data_path = "rajpurkar/squad"
-    train = load_dataset(data_path, split='train[:1000]')
-    val = load_dataset(data_path, split='validation[:100]')
-    dataset = DatasetDict()
-    dataset['train'], dataset['validation'] = train, val
-    return dataset
-
-
+    data_path = {"train": "../data/seq2seq_data.csv", "validation": "../data/seq2seq_data_dev.csv"}
+    return load_dataset("csv", data_files=data_path)
 
 
 # prepare header for the data to save
@@ -47,8 +42,8 @@ def store_data(data: list[list], filename):
         file.flush()
 
 
-def tokenize(dataset, tokenizer):
-    return tokenizer(dataset['text'], padding=True, truncation=True, return_tensors='pt')
+def tokenize(dataset, column, tokenizer):
+    return tokenizer(dataset[column], padding=True, truncation=True, return_tensors='pt')
 
 
 # make final evaluation of the model
@@ -94,6 +89,13 @@ def evaluate_baseline(dataset):
 
 
 def main():
+
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        out = torch.ones(1, device=device)
+        print(out)
+        print("MPS device found. - Apple Silicon GPU")
+
     # prepare data
     prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
     prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
@@ -101,27 +103,27 @@ def main():
     # prepare tokenizer and model
     pretrained_path = 'FacebookAI/roberta-base'
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
-    model_classification = load_module('classification')
     model_seq2seq = load_module('seq2seq')
     # hyperparams
     training_args = TrainingArguments(
         output_dir='model/',
-        evaluation_strategy='epoch',
+        evaluation_strategy='steps',
         learning_rate=1e-5,
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
-        num_train_epochs=10
+        num_train_epochs=1
     )
-    return
+
     dataset = load_data()
 
     # tokenize data
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
+    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer, 'column' : "input_ids"})
+    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer, 'column': "target"})
 
     # train the model
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
     trainer = Trainer(
-        model=model,
+        model=model_seq2seq,
         args=training_args,
         train_dataset=dataset['train'],
         eval_dataset=dataset['validation'],
@@ -133,7 +135,7 @@ def main():
 
     # final evaluation
     print('Baseline Metrics:', evaluate_baseline(dataset))
-    scores, confusion_mat = test_model(trainer, dataset['test'])
+    scores, confusion_mat = test_model(trainer, dataset['train'])
     store_data(confusion_mat, 'confusion.csv')
 
 
