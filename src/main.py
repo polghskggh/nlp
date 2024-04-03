@@ -67,7 +67,7 @@ def predict_question_answer(input_batch):
 
 def predict(input_batch):
     answers = predict_question_answer(input_batch)
-
+    print("answers ready")
     labels = predict_classifier(input_batch)
 
     ret = {key: answer if label.item() else "" for key, label, answer in zip(input_batch["id"], labels, answers)}
@@ -75,8 +75,8 @@ def predict(input_batch):
 
 
 def main():
-    validation_data = load_dataset("squad_v2", split="validation")
-
+    validation_data = load_dataset("squad_v2", split="validation[:500]")
+    print("dataset_loaded")
     with open("output", 'w', encoding='utf-8') as f:
         print(predict(validation_data), file=f)
 
