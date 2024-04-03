@@ -4,6 +4,8 @@ from transformers import AutoModelForQuestionAnswering, AutoModelForSequenceClas
 from transformers import AutoTokenizer
 import json
 
+from train.trainseq2seq import train_seq2seq
+
 if torch.backends.mps.is_available():
     device = torch.device("mps")
     print(device)
@@ -29,13 +31,13 @@ def predict_classifier(input_batch):
         for current in range(0, len(inputs["input_ids"]), batch_size):
             if outputs is None:
                 outputs = model(inputs["input_ids"][current: current + batch_size],
-                                inputs["attention_mask"][current: current + batch_size])
+                                inputs["attention_mask"][current: current + batch_size]).logits.argmax(-1)
             else:
                 outputs = torch.cat((outputs,
                                      model(inputs["input_ids"][current: current + batch_size],
-                                           inputs["attention_mask"][current: current + batch_size])), dim=0)
+                                           inputs["attention_mask"][current: current + batch_size]).logits.argmax(-1)), dim=0)
 
-    labels = outputs.logits.argmax(-1)
+    labels = outputs
     return labels
 
 
@@ -46,16 +48,18 @@ def predict_question_answer(input_batch):
     inputs = tokenizer(input_batch["question"], input_batch["context"],
                        truncation=True, padding=True, return_tensors="pt")
     outputs = None
-
+    answer_start_index = None
+    answer_end_index = None
     with torch.no_grad():
-        for current in range(0, len(inputs["question"]), batch_size):
-            if outputs is None:
-                outputs = model(question=inputs["question"][current: current + batch_size],
-                                context=inputs["context"][current: current + batch_size])
+        for current in range(0, len(inputs["input_ids"]), batch_size):
+            outputs = model(inputs["input_ids"][current: current + batch_size],
+                            inputs["attention_mask"][current: current + batch_size])
+            if answer_start_index is None: 
+                answer_start_index = outputs.start_logits.argmax(-1)
+                answer_end_index = outputs.end_logits.argmax(-1)
             else:
-                outputs = torch.cat((outputs,
-                                     model(question=inputs["question"][current: current + batch_size],
-                                           context=inputs["context"][current: current + batch_size])), dim=0)
+                answer_start_index = torch.cat((answer_start_index, outputs.end_logits.argmax(-1)), dim=0)
+                answer_end_index = torch.cat((answer_end_index, outputs.end_logits.argmax(-1)), dim=0)
 
     answer_start_index = outputs.start_logits.argmax(-1)
     answer_end_index = outputs.end_logits.argmax(-1)
