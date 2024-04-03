@@ -1,7 +1,7 @@
 import csv
 
 import numpy as np
-from datasets import load_dataset
+from datasets import load_dataset, DatasetDict
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, DataCollatorWithPadding, \
     Trainer
@@ -13,15 +13,24 @@ def load_module():
     return model
 
 
-# load the datasets
+# Load data
 def load_data():
-    data_path = {
-        "train": "programs/nlp/data/class_data.csv",
-        "validation": "programs/nlp/data/class_data_dev.csv",
-        "train2": "programs/nlp/data/seq2seq_data.csv",
-        "validation2": "programs/nlp/data/seq2seq_data_dev.csv"
-    }
-    return load_dataset('csv', data_files=data_path)
+    data_path = "rajpurkar/squad_v2"
+    train = load_dataset(data_path, split='train')
+    val = load_dataset(data_path, split='validation')
+    dataset = DatasetDict()
+
+    train_clean = {}
+    val_clean = {}
+
+    train_clean['text'] = train['context'] + train['question']
+    val_clean['text'] = val['context'] + val['question']
+
+    train_clean['label'] = train['is_impossible']
+    val_clean['label'] = val['is_impossible']
+
+    dataset['train'], dataset['validation'] = train_clean, val_clean
+    return dataset
 
 
 # prepare header for the data to save
