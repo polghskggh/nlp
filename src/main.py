@@ -2,8 +2,7 @@ import torch
 from datasets import load_dataset
 from transformers import AutoModelForQuestionAnswering, AutoModelForSequenceClassification
 from transformers import AutoTokenizer
-
-tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
+import json
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")
@@ -16,22 +15,10 @@ else:
     print(device)
 
 
-def preprocess_function(examples):
-    questions = [q.strip() for q in examples["question"]]
-    inputs = tokenizer(
-        questions,
-        examples["context"],
-        max_length=384,
-        truncation="only_second",
-        return_offsets_mapping=True,
-        padding="max_length",
-    )
+def predict_classifier(input_batch):
+    model = AutoModelForSequenceClassification.from_pretrained("programs/nlp/checkpoint-13000-classifier")
+    tokenizer = AutoTokenizer.from_pretrained("programs/nlp/checkpoint-13000-classifier")
 
-    return inputs
-
-
-def predict_classifier(input_batch, model, tokenizer):
-    tokenizer = AutoTokenizer.from_pretrained("../checkpoint-13000-classifier")
     classifier_input = [context + question for context, question in zip(input_batch["context"], input_batch["question"])]
     classifier_input = tokenizer(classifier_input, truncation=True, padding=True, return_tensors="pt")
     with torch.no_grad():
@@ -41,8 +28,10 @@ def predict_classifier(input_batch, model, tokenizer):
     return labels
 
 
-def predict_question_answer(input_batch, model, tokenizer):
-    tokenizer = AutoTokenizer.from_pretrained("../checkpoint-7500-seq2seq")
+def predict_question_answer(input_batch): 
+    model = AutoModelForQuestionAnswering.from_pretrained("programs/nlp/checkpoint-7500-seq2seq")
+    tokenizer = AutoTokenizer.from_pretrained("programs/nlp/checkpoint-7500-seq2seq")
+
     inputs = tokenizer(input_batch["question"], input_batch["context"],
                        truncation=True, padding=True, return_tensors="pt")
 
@@ -57,21 +46,20 @@ def predict_question_answer(input_batch, model, tokenizer):
     return answers
 
 
-def predict(input_batch, model_classifier, model_seq2seq, tokenizer):
-    answers = predict_question_answer(input_batch, model_seq2seq, tokenizer)
-    labels = predict_classifier(input_batch, model_classifier, tokenizer)
+def predict(input_batch):
+    answers = predict_question_answer(input_batch)
+
+    labels = predict_classifier(input_batch)
 
     ret = {key: answer if label.item() else "" for key, label, answer in zip(input_batch["id"], labels, answers)}
-    return ret
+    return json.dumps(ret)
 
 
 def main():
-    validation_data = load_dataset("squad_v2", split="validation[:1000]")
-    model_classifier = AutoModelForSequenceClassification.from_pretrained("../checkpoint-13000-classifier")
-    model_seq2seq = AutoModelForQuestionAnswering.from_pretrained("../checkpoint-7500-seq2seq")
+    validation_data = load_dataset("squad_v2", split="validation")
 
     with open("output", 'w', encoding='utf-8') as f:
-        print(predict(validation_data, model_classifier, model_seq2seq, tokenizer), file=f)
+        print(predict(validation_data), file=f)
 
 
 if __name__ == '__main__':
