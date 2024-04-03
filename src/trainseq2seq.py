@@ -64,7 +64,7 @@ def train_seq2seq():
 
     data_collator = DefaultDataCollator()
 
-    model = AutoModelForQuestionAnswering.from_pretrained("FacebookAI/roberta-base")
+    model = AutoModelForQuestionAnswering.from_pretrained("programs/nlp/checkpoint-7500-seq2seq")
 
     training_args = TrainingArguments(
         output_dir="qa_model",
@@ -72,7 +72,8 @@ def train_seq2seq():
         learning_rate=2e-5,
         per_device_train_batch_size=30,
         per_device_eval_batch_size=30,
-        num_train_epochs=3,
+        num_train_epochs=10,
+        save_steps=5000,
         weight_decay=0.01,
     )
 

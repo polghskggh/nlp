@@ -4,6 +4,8 @@ from transformers import AutoModelForQuestionAnswering, AutoModelForSequenceClas
 from transformers import AutoTokenizer
 import json
 
+from src.trainseq2seq import train_seq2seq
+
 if torch.backends.mps.is_available():
     device = torch.device("mps")
     print(device)
@@ -63,4 +65,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    train_seq2seq()
