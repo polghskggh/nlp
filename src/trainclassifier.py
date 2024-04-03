@@ -13,23 +13,17 @@ def load_module():
     return model
 
 
+def load_single(type: str):
+    data_path = "rajpurkar/squad_v2"
+    data = load_dataset(data_path, split=type)
+    data_clean = {"text": data['context'] + data['question'], "label": data['is_impossible']}
+    return data_clean
+
+
 # Load data
 def load_data():
-    data_path = "rajpurkar/squad_v2"
-    train = load_dataset(data_path, split='train')
-    val = load_dataset(data_path, split='validation')
     dataset = DatasetDict()
-
-    train_clean = {}
-    val_clean = {}
-
-    train_clean['text'] = train['context'] + train['question']
-    val_clean['text'] = val['context'] + val['question']
-
-    train_clean['label'] = train['is_impossible']
-    val_clean['label'] = val['is_impossible']
-
-    dataset['train'], dataset['validation'] = train_clean, val_clean
+    dataset['train'], dataset['validation'] = load_single("train"), load_single("validation")
     return dataset
 
 
