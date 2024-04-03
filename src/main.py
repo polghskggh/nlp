@@ -1,57 +1,93 @@
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset
+from transformers import AutoTokenizer
+from transformers import DefaultDataCollator
+from transformers import AutoModelForQuestionAnswering, TrainingArguments, Trainer
 
-from transformers import (Trainer, TrainingArguments, DataCollatorWithPadding,
-                          AutoTokenizer, AutoModelForSequenceClassification, AutoModelForSeq2SeqLM)
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
-from sklearn.dummy import DummyClassifier
-
-import numpy as np
-import csv
+tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
 
 
+def preprocess_function(examples):
+    questions = [q.strip() for q in examples["question"]]
+    inputs = tokenizer(
+        questions,
+        examples["context"],
+        max_length=384,
+        truncation="only_second",
+        return_offsets_mapping=True,
+        padding="max_length",
+    )
 
+    offset_mapping = inputs.pop("offset_mapping")
+    answers = examples["answers"]
+    start_positions = []
+    end_positions = []
 
+    for i, offset in enumerate(offset_mapping):
+        answer = answers[i]
+        start_char = answer["answer_start"][0]
+        end_char = answer["answer_start"][0] + len(answer["text"][0])
+        sequence_ids = inputs.sequence_ids(i)
 
-# make final evaluation of the model
-def test_model(trainer, dataset):
-    logits, labels, _ = trainer.predict(dataset)
-    predictions = np.argmax(logits, axis=-1)
-    metrics = compute_metrics(predictions, labels)
-    conf_matrix = confusion_matrix(labels, predictions)
-    return metrics, conf_matrix
+        # Find the start and end of the context
+        idx = 0
+        while sequence_ids[idx] != 1:
+            idx += 1
+        context_start = idx
+        while sequence_ids[idx] == 1:
+            idx += 1
+        context_end = idx - 1
 
+        # If the answer is not fully inside the context, label it (0, 0)
+        if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+            start_positions.append(0)
+            end_positions.append(0)
+        else:
+            # Otherwise it's the start and end token positions
+            idx = context_start
+            while idx <= context_end and offset[idx][0] <= start_char:
+                idx += 1
+            start_positions.append(idx - 1)
 
+            idx = context_end
+            while idx >= context_start and offset[idx][1] >= end_char:
+                idx -= 1
+            end_positions.append(idx + 1)
 
+    inputs["start_positions"] = start_positions
+    inputs["end_positions"] = end_positions
+    return inputs
 
 
 def main():
-    # prepare data
-    prepare_header(['accuracy', 'precision', 'recall', 'f1'], 'metrics.csv')
-    prepare_header(['0', '1', '2', '3', '4', '5', '6'], 'confusion.csv')
+    traing_data = load_dataset("squad", split="train")
+    validation_data = load_dataset("squad", split="validation")
+    tokenized_training_data = traing_data.map(preprocess_function, batched=True)
+    tokenized_validation_data = validation_data.map(preprocess_function, batched=True)
 
-    # prepare tokenizer and model
-    pretrained_path = 'FacebookAI/roberta-base'
-    tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
-    model_classification = load_module('classification')
-    model_seq2seq = load_module('seq2seq')
+    data_collator = DefaultDataCollator()
 
-    # hyperparams
+    model = AutoModelForQuestionAnswering.from_pretrained("FacebookAI/roberta-base")
+
     training_args = TrainingArguments(
-        output_dir='model/',
-        evaluation_strategy='epoch',
-        learning_rate=1e-5,
-        per_device_train_batch_size=9,
-        per_device_eval_batch_size=9,
-        num_train_epochs=10
+        output_dir="my_awesome_qa_model",
+        evaluation_strategy="epoch",
+        learning_rate=2e-5,
+        per_device_train_batch_size=30,
+        per_device_eval_batch_size=30,
+        num_train_epochs=3,
+        weight_decay=0.01,
     )
 
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=tokenized_training_data,
+        eval_dataset=tokenized_validation_data,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+    )
 
-
-
-    # final evaluation
-    scores, confusion_mat = test_model(trainer, dataset['test'])
-    store_data(confusion_mat, 'confusion.csv')
+    trainer.train()
 
 
 if __name__ == '__main__':
