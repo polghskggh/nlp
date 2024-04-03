@@ -10,44 +10,7 @@ import numpy as np
 import csv
 
 
-def load_module(model_type: str = 'seq2seq'):
-    if model_type == 'seq2seq':
-        pretrained_path = 'google/roberta2roberta_L-24_discofuse'
-        model = AutoModelForSeq2SeqLM.from_pretrained(pretrained_path)
-    else:
-        pretrained_path = 'FacebookAI/roberta-base'
-        model = AutoModelForSequenceClassification.from_pretrained(pretrained_path)
-    return model
 
-
-# load the datasets
-def load_data():
-    data_path = {
-        "train": "programs/nlp/data/class_data.csv",
-        "validation": "programs/nlp/data/class_data_dev.csv",
-        "train2": "programs/nlp/data/seq2seq_data.csv",
-        "validation2": "programs/nlp/data/seq2seq_data_dev.csv"
-    }
-    return load_dataset('csv', data_files=data_path)
-
-
-# prepare header for the data to save
-def prepare_header(header: list[str], filename):
-    with open(filename, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows([header])
-
-
-# save data
-def store_data(data: list[list], filename):
-    with open(filename, mode='a', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data)
-        file.flush()
-
-
-def tokenize(dataset, tokenizer):
-    return tokenizer(dataset['text'], padding=True, truncation=True, return_tensors='pt')
 
 
 # make final evaluation of the model
@@ -59,37 +22,7 @@ def test_model(trainer, dataset):
     return metrics, conf_matrix
 
 
-# extract predictions and labels from model output
-def prepare_labels(pred):
-    logits, labels = pred
-    predictions = np.argmax(logits, axis=-1)
-    return compute_metrics(predictions, labels)
 
-
-# compute and save accuracy, precision, recall and F1
-def compute_metrics(predictions, labels):
-    computations = [accuracy_score(labels, predictions),
-                    precision_score(labels, predictions, average='macro'),
-                    recall_score(labels, predictions, average='macro'),
-                    f1_score(labels, predictions, average='macro')]
-
-    store_data([computations], 'metrics.csv')
-
-    metrics = {
-        'accuracy': computations[0],
-        'precision': computations[1],
-        'recall': computations[2],
-        'f1': computations[3],
-    }
-    return metrics
-
-
-# evaluate the baseline model on the metrics
-def evaluate_baseline(dataset):
-    baseline = DummyClassifier(strategy='most_frequent')
-    baseline.fit(dataset['train']['text'], dataset['train']['labels'])
-    predictions = baseline.predict(dataset['test']['text'])
-    return compute_metrics(predictions, dataset['test']['labels'])
 
 
 def main():
@@ -113,37 +46,10 @@ def main():
         num_train_epochs=10
     )
 
-    dataset = load_data()
 
-    # tokenize data
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
 
-    # train the model
-    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    trainer = Trainer(
-        model=model_classification,
-        args=training_args,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['validation'],
-        tokenizer=tokenizer,
-        compute_metrics=prepare_labels,
-        data_collator=data_collator,
-    )
-    trainer.train()
-
-    trainer = Trainer(
-        model=model_seq2seq,
-        args=training_args,
-        train_dataset=dataset['train'],
-        eval_dataset=dataset['validation'],
-        tokenizer=tokenizer,
-        compute_metrics=prepare_labels,
-        data_collator=data_collator,
-    )
-    trainer.train()
 
     # final evaluation
-    print('Baseline Metrics:', evaluate_baseline(dataset))
     scores, confusion_mat = test_model(trainer, dataset['test'])
     store_data(confusion_mat, 'confusion.csv')
 
