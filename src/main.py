@@ -58,7 +58,7 @@ def predict_question_answer(input_batch):
                 answer_start_index = outputs.start_logits.argmax(-1)
                 answer_end_index = outputs.end_logits.argmax(-1)
             else:
-                answer_start_index = torch.cat((answer_start_index, outputs.end_logits.argmax(-1)), dim=0)
+                answer_start_index = torch.cat((answer_start_index, outputs.start_logits.argmax(-1)), dim=0)
                 answer_end_index = torch.cat((answer_end_index, outputs.end_logits.argmax(-1)), dim=0)
 
     answer_start_index = outputs.start_logits.argmax(-1)
@@ -79,11 +79,11 @@ def predict(input_batch):
 
 
 def main():
-    validation_data = load_dataset("squad_v2", split="validation[:500]")
+    validation_data = load_dataset("squad_v2", split="validation")
     print("dataset_loaded")
     with open("output", 'w', encoding='utf-8') as f:
         print(predict(validation_data), file=f)
 
 
 if __name__ == '__main__':
-    main()
+    train_seq2seq()
