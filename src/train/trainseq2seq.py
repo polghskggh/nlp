@@ -1,18 +1,17 @@
 from datasets import load_dataset
-from transformers import AutoTokenizer, DefaultDataCollator, AutoModelForQuestionAnswering, TrainingArguments, Trainer
+from transformers import AutoTokenizer, DefaultDataCollator, AutoModelForQuestionAnswering, TrainingArguments, Trainer, \
+    EarlyStoppingCallback
 
 tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
 
 
 def preprocess_function(examples):
-    questions = [q.strip() for q in examples["question"]]
     inputs = tokenizer(
-        questions,
+        examples["question"],
         examples["context"],
-        max_length=384,
-        truncation="only_second",
+        truncation=True,
         return_offsets_mapping=True,
-        padding="max_length",
+        padding=True,
     )
 
     offset_mapping = inputs.pop("offset_mapping")
@@ -66,6 +65,11 @@ def train_seq2seq():
 
     model = AutoModelForQuestionAnswering.from_pretrained("FacebookAI/roberta-base")
 
+    early_stopping_callback = EarlyStoppingCallback(
+        early_stopping_patience=1,  # Stop after 3 evaluations without improvement
+        early_stopping_threshold=0.001,  # A minimum improvement of 0.001 is required
+    )
+
     training_args = TrainingArguments(
         output_dir="qa_model",
         evaluation_strategy="steps",
@@ -73,7 +77,7 @@ def train_seq2seq():
         per_device_train_batch_size=30,
         per_device_eval_batch_size=30,
         num_train_epochs=3,
-        save_steps=1000,
+        save_steps=3000,
         weight_decay=0.01,
     )
 
@@ -84,6 +88,7 @@ def train_seq2seq():
         eval_dataset=tokenized_validation_data,
         tokenizer=tokenizer,
         data_collator=data_collator,
+        callbacks=[early_stopping_callback],
     )
 
     trainer.train()

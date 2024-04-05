@@ -4,7 +4,7 @@ import numpy as np
 from datasets import load_dataset, DatasetDict
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, DataCollatorWithPadding, \
-    Trainer
+    Trainer, EarlyStoppingCallback
 
 
 def load_module():
@@ -79,6 +79,11 @@ def train_classifier():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
     model_classification = load_module()
 
+    early_stopping_callback = EarlyStoppingCallback(
+        early_stopping_patience=1,  # Stop after 3 evaluations without improvement
+        early_stopping_threshold=0.001,  # A minimum improvement of 0.001 is required
+    )
+
     # hyperparams
     training_args = TrainingArguments(
         output_dir='model/',
@@ -86,6 +91,7 @@ def train_classifier():
         learning_rate=1e-5,
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
+        save_steps=3000,
         num_train_epochs=10
     )
 
@@ -104,6 +110,7 @@ def train_classifier():
         tokenizer=tokenizer,
         compute_metrics=prepare_labels,
         data_collator=data_collator,
+        callbacks=[early_stopping_callback]
     )
     trainer.train()
     return model_classification
