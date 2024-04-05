@@ -24,16 +24,25 @@ batch_size = 30
 
 def batch_pass(model, inputs):
     outputs = []
+    model.to(device)
+    print(model.device)
     for current in range(0, len(inputs["input_ids"]), batch_size):
-        outputs.append(model(inputs["input_ids"][current: current + batch_size],
-                             inputs["attention_mask"][current: current + batch_size]))
+        input_ids = inputs["input_ids"][current: current + batch_size]
+        attention_mask = inputs["attention_mask"][current: current + batch_size]
+
+        input_ids = input_ids.to(device)
+        attention_mask = attention_mask.to(device)
+
+        outputs.append(model(input_ids, attention_mask))
         print(f"batch {current} passed")
     return outputs
 
 
 def predict_classifier(input_batch):
-    model = AutoModelForSequenceClassification.from_pretrained("programs/nlp/checkpoint-13000-classifier")
-    tokenizer = AutoTokenizer.from_pretrained("programs/nlp/checkpoint-13000-classifier")
+    habrok_path = "programs/nlp/checkpoint-13000-classifier"
+    relative_path = "../checkpoint-13000-classifier"
+    model = AutoModelForSequenceClassification.from_pretrained(habrok_path)
+    tokenizer = AutoTokenizer.from_pretrained(habrok_path)
 
     inputs = [context + question for context, question in zip(input_batch["context"], input_batch["question"])]
     inputs = tokenizer(inputs, truncation=True, padding=True, return_tensors="pt")
@@ -46,9 +55,12 @@ def predict_classifier(input_batch):
     return labels
 
 
-def predict_question_answer(input_batch): 
-    model = AutoModelForQuestionAnswering.from_pretrained("qa_model/checkpoint-5000")
-    tokenizer = AutoTokenizer.from_pretrained("qa_model/checkpoint-5000")
+def predict_question_answer(input_batch):
+    habrok_path = "qa_model/checkpoint-5000"
+    relative_path = "../checkpoint-5000-seqseq"
+
+    model = AutoModelForQuestionAnswering.from_pretrained(habrok_path)
+    tokenizer = AutoTokenizer.from_pretrained(habrok_path)
 
     inputs = tokenizer(input_batch["question"], input_batch["context"],
                        truncation=True, padding=True, return_tensors="pt")
@@ -75,7 +87,7 @@ def predict(input_batch):
 
 
 def main():
-    validation_data = load_dataset("squad_v2", split="validation[:100]")
+    validation_data = load_dataset("squad_v2", split="validation[:40]")
     print("dataset_loaded")
     results = predict(validation_data)
 
