@@ -5,6 +5,7 @@ from transformers import AutoTokenizer
 import json
 
 from train.trainseq2seq import train_seq2seq
+from train.trainclassifier import train_classifier
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")

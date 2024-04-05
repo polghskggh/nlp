@@ -86,8 +86,8 @@ def train_classifier():
 
     # hyperparams
     training_args = TrainingArguments(
-        output_dir='model/',
-        evaluation_strategy='epoch',
+        output_dir='classif_model',
+        evaluation_strategy='steps',
         learning_rate=1e-5,
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
