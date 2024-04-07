@@ -86,7 +86,6 @@ def predict(input_batch):
     ret = {key: answer if label.item() else "" for key, label, answer in zip(input_batch["id"], labels, answers)}
     return json.dumps(ret)
 
-
 def main():
     validation_data = load_dataset("squad_v2", split="validation[:40]")
     print("dataset_loaded")
@@ -97,4 +96,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    train_seq2seq()
