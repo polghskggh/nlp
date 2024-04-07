@@ -16,7 +16,7 @@ def load_module():
 def load_single(type: str):
     data_path = "rajpurkar/squad_v2"
     data = load_dataset(data_path, split=type)
-    data_clean = {"text": data['context'] + data['question'], "label": data['is_impossible']}
+    data_clean = {"text": data['context'] + data['question'], "label": len(data['answers']['answer_start']) > 0}
     return data_clean
 
 
