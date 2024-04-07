@@ -79,6 +79,7 @@ def train_seq2seq():
         num_train_epochs=10,
         save_steps=3000,
         weight_decay=0.01,
+        load_best_model_at_end=True,
     )
 
     trainer = Trainer(
@@ -92,4 +93,5 @@ def train_seq2seq():
     )
 
     trainer.train()
+    model.save("qa_model")
     return model

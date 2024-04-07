@@ -92,7 +92,8 @@ def train_classifier():
         per_device_train_batch_size=9,
         per_device_eval_batch_size=9,
         save_steps=3000,
-        num_train_epochs=10
+        num_train_epochs=10,
+        load_best_model_at_end=True,
     )
 
     dataset = load_data()
@@ -112,5 +113,7 @@ def train_classifier():
         data_collator=data_collator,
         callbacks=[early_stopping_callback]
     )
+
     trainer.train()
+    model_classification.save("classif_model")
     return model_classification
