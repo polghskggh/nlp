@@ -16,7 +16,7 @@ def load_single(type: str):
     data_path = "rajpurkar/squad_v2"
     data = load_dataset(data_path, split=type)
     data_clean = {"text": [context + ' ' + answer for context, answer in zip(data['context'], data['question'])],
-                  "label": [len(answer["text"]) > 0 for answer in data['answers']]}
+                  "label": [int(len(answer["text"]) > 0) for answer in data['answers']]}
     return Dataset.from_dict(data_clean)
 
 
@@ -79,6 +79,11 @@ def train_classifier():
     tokenizer = AutoTokenizer.from_pretrained(pretrained_path)
     model_classification = load_module()
 
+    dataset = load_data()
+
+    # tokenize data
+    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
+
     early_stopping_callback = EarlyStoppingCallback(
         early_stopping_patience=1,  # Stop after 1 evaluation without improvement
         early_stopping_threshold=0.001,  # A minimum improvement of 0.001 is required
@@ -95,11 +100,6 @@ def train_classifier():
         num_train_epochs=10,
         load_best_model_at_end=True,
     )
-
-    dataset = load_data()
-
-    # tokenize data
-    dataset = dataset.map(tokenize, batched=True, fn_kwargs={'tokenizer': tokenizer})
 
     # train the model
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)

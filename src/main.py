@@ -84,7 +84,7 @@ def predict(input_batch):
 
 
 def main():
-    validation_data = load_dataset("squad_v2", split="validation[:40]")
+    validation_data = load_dataset("squad_v2", split="validation")
     print("dataset_loaded")
     results = predict(validation_data)
 
