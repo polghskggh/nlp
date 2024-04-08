@@ -1,10 +1,12 @@
 from datasets import load_dataset
-from transformers import AutoTokenizer, DefaultDataCollator, AutoModelForQuestionAnswering, TrainingArguments, Trainer, \
-    EarlyStoppingCallback
+from transformers import AutoTokenizer, DefaultDataCollator, AutoModelForQuestionAnswering
+from transformers import TrainingArguments, Trainer, EarlyStoppingCallback
 
 tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
 
 
+# inspired by Hugging Face tutorial
+# https://huggingface.co/docs/transformers/tasks/question_answering
 def preprocess_function(examples):
     inputs = tokenizer(
         examples["question"],
@@ -56,17 +58,18 @@ def preprocess_function(examples):
 
 
 def train_qna():
-    traing_data = load_dataset("squad", split="train")
+    # load and preprocess data
+    training_data = load_dataset("squad", split="train")
     validation_data = load_dataset("squad", split="validation")
-    tokenized_training_data = traing_data.map(preprocess_function, batched=True)
+    tokenized_training_data = training_data.map(preprocess_function, batched=True)
     tokenized_validation_data = validation_data.map(preprocess_function, batched=True)
 
+    # prepare model and train model
     data_collator = DefaultDataCollator()
-
     model = AutoModelForQuestionAnswering.from_pretrained("FacebookAI/roberta-base")
 
     early_stopping_callback = EarlyStoppingCallback(
-        early_stopping_patience=1,  # Stop after 3 evaluations without improvement
+        early_stopping_patience=1,  # Stop after 1 evaluation without improvement
         early_stopping_threshold=0.001,  # A minimum improvement of 0.001 is required
     )
 
@@ -94,3 +97,7 @@ def train_qna():
 
     trainer.train()
     return model
+
+
+if __name__ == '__main__':
+    train_qna()

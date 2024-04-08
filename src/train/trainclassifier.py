@@ -1,10 +1,9 @@
 import csv
-
 import numpy as np
 from datasets import load_dataset, DatasetDict, Dataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, DataCollatorWithPadding, \
-    Trainer, EarlyStoppingCallback
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments
+from transformers import DataCollatorWithPadding, Trainer, EarlyStoppingCallback
 
 
 def load_module():
@@ -81,7 +80,7 @@ def train_classifier():
     model_classification = load_module()
 
     early_stopping_callback = EarlyStoppingCallback(
-        early_stopping_patience=1,  # Stop after 3 evaluations without improvement
+        early_stopping_patience=1,  # Stop after 1 evaluation without improvement
         early_stopping_threshold=0.001,  # A minimum improvement of 0.001 is required
     )
 
@@ -117,3 +116,7 @@ def train_classifier():
 
     trainer.train()
     return model_classification
+
+
+if __name__ == '__main__':
+    train_classifier()
