@@ -20,7 +20,11 @@ In the `train` directory, there two scripts: `trainclassifier.py` and `trainqna.
 
 Each script trains the corresponding model and saves it (with potentially multiple checkpoints).
 
-You can run each of the scripts by itself. Alternatively, you can use `main.py` and call the train functions from the scripts there.
+You should run each of the scripts in terminal by calling:
+```bash
+python3 trainclassifier.py
+python3 trainqna.py
+```
 
 ### Generating predictions
 
