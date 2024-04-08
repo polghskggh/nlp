@@ -4,7 +4,7 @@ from transformers import AutoModelForQuestionAnswering, AutoModelForSequenceClas
 from transformers import AutoTokenizer
 import json
 
-from train.trainseq2seq import train_seq2seq
+from train.trainqna import train_qna
 from train.trainclassifier import train_classifier
 
 if torch.backends.mps.is_available():
@@ -12,9 +12,6 @@ if torch.backends.mps.is_available():
     print(device)
 elif torch.cuda.is_available():
     device = torch.device("cuda")
-    print(device)
-elif torch.roc.is_available():
-    device = torch.device("roc")
     print(device)
 else:
     device = torch.device("cpu")
@@ -57,8 +54,8 @@ def predict_classifier(input_batch):
 
 
 def predict_question_answer(input_batch):
-    habrok_path = "qa_model/checkpoint-5000"
-    relative_path = "../checkpoint-5000-seqseq"
+    habrok_path = "qa_model/checkpoint-6000"
+    relative_path = "../checkpoint-6000"
 
     model = AutoModelForQuestionAnswering.from_pretrained(habrok_path)
     tokenizer = AutoTokenizer.from_pretrained(habrok_path)
@@ -86,6 +83,7 @@ def predict(input_batch):
     ret = {key: answer if label.item() else "" for key, label, answer in zip(input_batch["id"], labels, answers)}
     return json.dumps(ret)
 
+
 def main():
     validation_data = load_dataset("squad_v2", split="validation[:40]")
     print("dataset_loaded")
@@ -96,4 +94,4 @@ def main():
 
 
 if __name__ == '__main__':
-    train_seq2seq()
+    main()

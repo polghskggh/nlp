@@ -1,7 +1,7 @@
 import csv
 
 import numpy as np
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, Dataset
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, TrainingArguments, DataCollatorWithPadding, \
     Trainer, EarlyStoppingCallback
@@ -16,8 +16,9 @@ def load_module():
 def load_single(type: str):
     data_path = "rajpurkar/squad_v2"
     data = load_dataset(data_path, split=type)
-    data_clean = {"text": data['context'] + data['question'], "label": len(data['answers']['answer_start']) > 0}
-    return data_clean
+    data_clean = {"text": [context + ' ' + answer for context, answer in zip(data['context'], data['question'])],
+                  "label": [len(answer["text"]) > 0 for answer in data['answers']]}
+    return Dataset.from_dict(data_clean)
 
 
 # Load data
@@ -115,5 +116,4 @@ def train_classifier():
     )
 
     trainer.train()
-    model_classification.save("classif_model")
     return model_classification

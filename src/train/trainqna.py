@@ -55,7 +55,7 @@ def preprocess_function(examples):
     return inputs
 
 
-def train_seq2seq():
+def train_qna():
     traing_data = load_dataset("squad", split="train")
     validation_data = load_dataset("squad", split="validation")
     tokenized_training_data = traing_data.map(preprocess_function, batched=True)
@@ -93,5 +93,4 @@ def train_seq2seq():
     )
 
     trainer.train()
-    model.save("qa_model")
     return model
