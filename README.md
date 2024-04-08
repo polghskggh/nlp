@@ -34,7 +34,7 @@ To evaluate the predictions made by the system, you can `evaluation.py`. This is
 ```bash
 python3 evaluation.py <path_to_dev-v2.0> <path_to_predictions>
 ```
-We use the development/validation set, as the test set is not publicly available. The dataset is available in the `src` module.
+We use the development/validation set, as the test set is not publicly available. The dataset is available in the `data` folder.
 
 ### Notes
 
