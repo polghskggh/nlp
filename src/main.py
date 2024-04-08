@@ -79,7 +79,6 @@ def predict(input_batch):
     print("classifier done")
     answers = predict_question_answer(input_batch)
     print("answering done")
-    print(labels.shape)
     ret = {key: answer if label.item() else "" for key, label, answer in zip(input_batch["id"], labels, answers)}
     return json.dumps(ret)
 
