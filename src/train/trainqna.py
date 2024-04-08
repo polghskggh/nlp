@@ -8,12 +8,14 @@ tokenizer = AutoTokenizer.from_pretrained("FacebookAI/roberta-base")
 # inspired by Hugging Face tutorial
 # https://huggingface.co/docs/transformers/tasks/question_answering
 def preprocess_function(examples):
+    questions = [q.strip() for q in examples["question"]]
     inputs = tokenizer(
-        examples["question"],
+        questions,
         examples["context"],
-        truncation=True,
+        max_length=384,
+        truncation="only_second",
         return_offsets_mapping=True,
-        padding=True,
+        padding="max_length",
     )
 
     offset_mapping = inputs.pop("offset_mapping")
@@ -77,8 +79,8 @@ def train_qna():
         output_dir="qa_model",
         evaluation_strategy="steps",
         learning_rate=2e-5,
-        per_device_train_batch_size=30,
-        per_device_eval_batch_size=30,
+        per_device_train_batch_size=5,
+        per_device_eval_batch_size=5,
         num_train_epochs=10,
         save_steps=3000,
         weight_decay=0.01,
